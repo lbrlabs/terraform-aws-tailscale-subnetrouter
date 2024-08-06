@@ -36,4 +36,14 @@ module "lbr-subnet-router" {
   advertise_addresses = [module.lbr-vpc.vpc_cidr_block]
   public              = true
   vpc_id              = module.lbr-vpc.vpc_id
+  additional_parts = [{
+    filename     = "cloudwatch-agent"
+    content_type = "text/x-shellscript"
+    content      = <<-EOF
+#!/bin/sh
+wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
+dpkg -i -E /tmp/amazon-cloudwatch-agent.deb
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c ssm:AmazonCloudWatch-linux-lbr
+EOF
+  }]
 }

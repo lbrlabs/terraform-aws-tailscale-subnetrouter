@@ -13,12 +13,14 @@ module "tailscale-subnet-router" {
 }
 
 resource "aws_security_group" "sg" {
+  #checkov:skip=CKV2_AWS_5:Security groups is attached to the ASG
   name        = "${var.name}-sg"
   description = "Security group for Tailscale subnet router ${var.name}"
   vpc_id      = var.vpc_id
 }
 
 resource "aws_security_group_rule" "allow_all_outbound" {
+  description       = "allow all outbound traffic"
   type              = "egress"
   from_port         = 0
   to_port           = 0
@@ -30,7 +32,7 @@ resource "aws_security_group_rule" "allow_all_outbound" {
 
 module "asg" {
   source  = "terraform-aws-modules/autoscaling/aws"
-  version = "~> 6.5"
+  version = "~> 7.7"
 
   name = var.name
 
@@ -41,7 +43,7 @@ module "asg" {
   wait_for_capacity_timeout       = 0
   health_check_type               = "EC2"
   vpc_zone_identifier             = var.subnet_ids
-  
+
 
   launch_template_name        = "lt-${var.name}"
   launch_template_description = "Launch template for Tailscale subnet router ${var.name}"
@@ -57,12 +59,22 @@ module "asg" {
     delete_on_termination       = true
   }] : []
 
+  instance_refresh = {
+    strategy = "Rolling"
+    preferences = {
+      min_healthy_percentage = 100
+      instance_warmup        = 100
+    }
+  }
+
   create_iam_instance_profile = true
   iam_role_name               = "iam-${var.name}"
   iam_role_path               = "/ec2/"
   iam_role_description        = "IAM role for Tailscale subnet router ${var.name}"
   iam_role_policies = {
     AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    CloudwatchAgentAdminPolicy   = "arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy"
+    AutoScalingFullAccess        = "arn:aws:iam::aws:policy/AutoScalingFullAccess"
   }
 
   user_data = module.tailscale-subnet-router.rendered
